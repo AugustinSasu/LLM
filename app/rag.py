@@ -5,7 +5,7 @@ from chromadb.api.types import EmbeddingFunction
 import requests
 
 
-# --- Custom Ollama Embedding Function ---
+# Using Ollama instead of OpenAI since OpenAI key is not available :)
 class OllamaEmbeddingFunction(EmbeddingFunction):
     # Ollama uses nomic-embed-text; OpenAI uses text-embedding-3-small
     def __init__(self, model="nomic-embed-text"):
@@ -24,6 +24,7 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
 
 
 def query_ollama(model_name, user_prompt):
+    # the local server address where Ollama runs
     url = "http://localhost:11434/api/generate"
     payload = {"model": model_name, "prompt": user_prompt, "stream": False}
     response = requests.post(url, json=payload)
@@ -32,7 +33,7 @@ def query_ollama(model_name, user_prompt):
 
 
 # extracting the titles and summaries
-def load_books(path="../data/books.txt"):
+def load_books(path="data/books.txt"):
     with open(path, "r") as file:
         content = file.read()
 
@@ -54,34 +55,38 @@ def load_books(path="../data/books.txt"):
 
 
 def create_vector_store(titles, summaries):
+    # connects to a local ChromaDB database
     client = chromadb.PersistentClient(path="./chroma_db")
     embedding_fn = OllamaEmbeddingFunction()
 
-    # ChromaDB doesn't allow overwriting so we need to delete the old collection first
-    if "books" in [c.name for c in client.list_collections()]:
+    # get a list of all collection names already stored in the db
+    existing_collections = [c.name for c in client.list_collections()]
+
+    # If the collection "books" exists, delete and recreate to ensure fresh data
+    if "books" in existing_collections:
         client.delete_collection("books")
 
-    # Create a collection
+    # Create the collection
     collection = client.create_collection("books", embedding_function=embedding_fn)
 
-    # Add documents to the collection
+    # Add documents to the "books" collection
     collection.add(
         documents=summaries,
         ids=[f"book{i}" for i in range(len(titles))],
         metadatas=[{"title": title} for title in titles]
     )
-
     return collection
 
 
 # test_search needs it's own client and embedding function to access and search
+# to use this change the path at line 37 to ../data/books.txt and app.tools instead of tools
 def test_search(query: str):
     client = chromadb.PersistentClient(path="./chroma_db")
     embedding_fn = OllamaEmbeddingFunction()
     collection = client.get_collection("books", embedding_function=embedding_fn)
 
     results = collection.query(query_texts=[query], n_results=3)
-    print("\n🔍 Query:", query)
+    print("\n Query:", query)
     for title, doc in zip(results["metadatas"][0], results["documents"][0]):
         print(f"\n Title: {title['title']}\n Summary: {doc}")
 
@@ -90,8 +95,3 @@ if __name__ == "__main__":
     titles, summaries = load_books()
     create_vector_store(titles, summaries)
     test_search("magic and friendship")
-
-    model_name = "mistral"
-    user_prompt = "What is the capital of Japan? Respond in JSON format."
-    print("\n Ollama Model Response:")
-    print(query_ollama(model_name, user_prompt))
