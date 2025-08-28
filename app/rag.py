@@ -16,6 +16,7 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
 
     def get_embedding(self, text):
         response = requests.post(
+            # the local server address where Ollama runs
             "http://localhost:11434/api/embeddings",
             json={"model": self.model, "prompt": text}
         )
