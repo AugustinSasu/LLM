@@ -8,6 +8,8 @@ The user cand also choose the app to transform the response to speech via "Mute"
 
 It uses the basic Python GUI Tkinter.
 
+It has a basic filter for language.
+
 Simply run gui.py to run the app and enter your prompts.
 
 main.py was used for testing the prompts in the terminal.
