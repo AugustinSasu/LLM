@@ -3,16 +3,17 @@ from chromadb.config import Settings
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from chromadb.api.types import EmbeddingFunction
 import requests
+import numpy as np
 
 
-# Using Ollama instead of OpenAI since OpenAI key is not available :)
+# Using Ollama instead of OpenAI since OpenAI key was not available :)
 class OllamaEmbeddingFunction(EmbeddingFunction):
     # Ollama uses nomic-embed-text; OpenAI uses text-embedding-3-small
     def __init__(self, model="nomic-embed-text"):
         self.model = model
 
     def __call__(self, texts):
-        return [self.get_embedding(text) for text in texts]
+        return [self._normalize(self.get_embedding(text)) for text in texts]
 
     def get_embedding(self, text):
         response = requests.post(
@@ -22,6 +23,11 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
         )
         response.raise_for_status()
         return response.json()["embedding"]
+
+    # the embeddings should be normalized
+    def _normalize(self, vec):
+        norm = np.linalg.norm(vec)
+        return [x / norm for x in vec] if norm != 0 else vec
 
 
 def query_ollama(model_name, user_prompt):
@@ -35,11 +41,11 @@ def query_ollama(model_name, user_prompt):
 
 # extracting the titles and summaries
 def load_books(path="data/books.txt"):
-    with open(path, "r") as file:
+    with open(path, "r", encoding="utf-8") as file:
         content = file.read()
 
     # split() does not include the separator in the resulting strings
-    books = content.split("## Title: ")[1:]
+    books = content.split("## Title: ")[1:] # [1:] to skip the first element of the "books" list because it's an empty string
     summaries = []
     titles = []
 
